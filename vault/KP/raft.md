@@ -1,6 +1,9 @@
 ---
-id: "01J5K805"
+id: "01J5K80123456789ABCDEFGHKP"
 title: "Raft"
+type: note
+status: active
+parents: [distributed-systems]
 share_id: "sh_raft_99"
 visibility: "collaborative"
 ---

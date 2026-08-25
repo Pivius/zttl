@@ -1,121 +1,71 @@
-use crate::sys::FsEntry;
-use crate::tree::{DirectoryNode, DocumentNode, WorkspaceNode};
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-
+use crate::graph::GraphIndex;
+use crate::model::Note;
+use crate::parser;
+use crate::sys::SystemIO;
+use std::path::Path;
 
 pub struct VaultScanner;
 
 impl VaultScanner {
-	pub fn build_workspace(
-		workspace_name: String,
-		root_path: PathBuf,
-		entries: Vec<FsEntry>
-	) -> WorkspaceNode {
-		let mut workspace = WorkspaceNode {
-			name: workspace_name,
-			root_path,
-			directories: BTreeMap::new(),
-			root_documents: BTreeMap::new()
-		};
+	pub fn scan(vault_path: &Path) -> Result<GraphIndex, Box<dyn std::error::Error>> {
+		let root = SystemIO::normalize_canonical_path(vault_path)?;
+		let files = SystemIO::collect_markdown_files(&root)?;
+		let mut notes = Vec::with_capacity(files.len());
 
-		let mut raw_dirs = Vec::new();
-		let mut raw_files = Vec::new();
-
-		for entry in entries {
-			match entry {
-				FsEntry::Directory { relative_path } => raw_dirs.push(relative_path),
-				FsEntry::File { relative_path } => raw_files.push(relative_path)
-			}
+		for rel in files {
+			notes.push(Self::parse_file(&root, &rel)?);
 		}
 
-		for dir_path in raw_dirs {
-			Self::insert_directory(&mut workspace, &dir_path);
-		}
-
-		for file_path in raw_files {
-			let stem = file_path
-				.file_stem()
-				.unwrap_or_default()
-				.to_string_lossy()
-				.to_string();
-			let doc_node = DocumentNode {
-				title: stem.clone(),
-				relative_path: file_path.clone()
-			};
-			let parent_dir = file_path.parent().unwrap_or(Path::new(""));
-
-			if parent_dir == Path::new("") {
-				if let Some(dir_node) = workspace.directories.get_mut(&stem) {
-					dir_node.container_document = Some(doc_node);
-				} else {
-					workspace.root_documents.insert(stem, doc_node);
-				}
-			} else if let Some(parent_node) = Self::get_dir_mut(&mut workspace, parent_dir) {
-				if let Some(child_dir) = parent_node.subdirectories.get_mut(&stem) {
-					child_dir.container_document = Some(doc_node);
-				} else {
-					parent_node.documents.insert(stem, doc_node);
-				}
-			}
-		}
-
-		workspace
+		Ok(GraphIndex::build(notes))
 	}
-
-	fn insert_directory(workspace: &mut WorkspaceNode, rel_path: &Path) {
-		let components: Vec<_> = rel_path
-			.components()
-			.map(|c| c.as_os_str().to_string_lossy().to_string())
-			.collect();
-
-		if components.is_empty() {
-			return
-		}
-
-		let first = &components[0];
-		let root_dir = workspace
-			.directories
-			.entry(first.clone())
-			.or_insert_with(|| DirectoryNode {
-				name: first.clone(),
-				relative_path: PathBuf::from(first),
-				container_document: None,
-				subdirectories: BTreeMap::new(),
-				documents: BTreeMap::new()
-			});
+	
+	fn parse_file(root: &Path, rel: &Path) -> Result<Note, Box<dyn std::error::Error>> {
+		let content = std::fs::read_to_string(root.join(rel))?;
+		let normalized = parser::normalize(&content);
+		let (fm, body) = parser::split_frontmatter(&normalized);
+		let frontmatter = parser::parse_frontmatter(fm)?;
+		let parsed = parser::parse_body(body);
+		let slug = rel
+			.file_stem()
+			.map(|s| s.to_string_lossy().to_string())
+			.unwrap_or_default();
 		
-		let mut current = root_dir;
-		let mut acc_path = PathBuf::from(first);
-
-		for part in &components[1..] {
-			acc_path.push(part);
-			current = current
-				.subdirectories
-				.entry(part.clone())
-				.or_insert_with(|| DirectoryNode { 
-					name: part.clone(), 
-					relative_path: acc_path.clone(), 
-					container_document: None, 
-					subdirectories: BTreeMap::new(), 
-					documents: BTreeMap::new()
-				});
-		}
-	}
-
-	fn get_dir_mut<'a>(
-		workspace: &'a mut WorkspaceNode,
-		rel_path: &Path
-	) -> Option<&'a mut DirectoryNode> {
-		let mut components = rel_path.components().map(|c| c.as_os_str().to_str());
-		let first = components.next()??;
-		let mut current = workspace.directories.get_mut(first)?;
-
-		for part in components {
-			let p = part?;
-			current = current.subdirectories.get_mut(p)?;
-		}
-
-		Some(current)
+		Ok(Note {
+			slug,
+			path: rel.to_path_buf(),
+			frontmatter,
+			links: parsed.links,
+			transclusions: parsed.transclusions,
+			blocks: parsed.blocks,
+		})
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	
+	#[test]
+	fn scans_fixture_vault() {
+		let idx = VaultScanner::scan(Path::new("./vault")).unwrap();
+		assert_eq!(idx.graph.node_count(), 7);
+		
+		let ds = idx.resolve("Data Structures").unwrap();
+		let algo = idx.resolve("algorithms").unwrap();
+		assert!(idx.graph.contains_edge(ds, algo));
+		
+		assert_eq!(idx.descendants(ds).len(), 4);
+		assert!(idx.block_registry.contains_key("raft-elem-01"));
+		assert!(idx.block_registry.contains_key("algo-bound-01"));
+		
+		assert!(idx
+			.unresolved_links
+			.iter()
+			.any(|(s, t)| s == "unsorted-inbox" && t == "Graph Theory"));
+			assert!(idx
+				.unresolved_transclusions
+				.iter()
+				.any(|(s, t)| s == "raft" && t == "cs-root-01"));
+			}
+		}
+		

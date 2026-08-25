@@ -3,6 +3,7 @@ use petgraph::graph::{Graph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 use std::collections::{HashMap, HashSet};
+use ulid::Ulid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EdgeKind {
@@ -172,6 +173,45 @@ impl GraphIndex {
 		}
 		out
 	}
+
+	pub fn resolve_fuzzy(&self, target: &str) -> Option<NodeIndex> {
+		if let Some(idx) = self.resolve(target) {
+			return Some(idx);
+		}
+	
+		let target_lower = target.to_lowercase();
+		let target_norm = target_lower.replace(['-', '_', ' '], "");
+		let mut best: Option<(i32, usize, NodeIndex)> = None;
+	
+		for (slug, idx) in &self.by_slug {
+			let score = fuzzy_score(&slug, &target_lower, &target_norm);
+
+			if score > 0 {
+				let key = (score, slug.len());
+				if best.map_or(true, |(bs, bl, _)| key.0 > bs || (key.0 == bs && key.1 < bl)) {
+					best = Some((key.0, key.1, *idx))
+				}
+			}
+		}
+
+		for (title, idx) in &self.by_title {
+			let score = fuzzy_score(&title, &target_lower, &target_norm);
+
+			if score > 0 {
+				let key = (score, title.len());
+
+				if best.map_or(true, |(bs, bl, _)| key.0 > bs || (key.0 == bs && key.1 < bl)) {
+					best = Some((key.0, key.1, *idx));
+				}
+			}
+		}
+
+		best.map(|(_, _, idx)| idx)
+	}
+
+	pub fn generate_ulid() -> Ulid {
+		Ulid::generate()
+	}
 }
 
 fn resolve_ref(
@@ -189,8 +229,19 @@ fn resolve_ref(
 	by_slug.get(target).copied()
 }
 
+fn fuzzy_score(candidate: &str, target_lower: &str, target_norm: &str) -> i32 {
+	let c_lower = candidate.to_lowercase();
+	let c_norm = c_lower.replace(['-', '_', ' '], "");
+	if c_lower == target_lower {100}
+	else if c_norm == target_norm {90}
+	else if c_lower.starts_with(target_lower) || target_lower.starts_with(&c_lower) {60}
+	else if c_lower.contains(target_lower) || target_lower.contains(&c_lower) {40}
+	else {0}
+}
+
 #[cfg(test)]
 mod tests {
+	use std::assert_eq;
 	use super::*;
 	use crate::model::Frontmatter;
 	
@@ -212,6 +263,7 @@ mod tests {
 				parents: parents.map(|v| v.into_iter().map(str::to_string).collect()),
 				..Default::default()
 			},
+			body: String::new(),
 			links: links.into_iter().map(str::to_string).collect(),
 			transclusions: Vec::new(),
 			blocks: Vec::new(),
@@ -276,5 +328,56 @@ mod tests {
 			NoteType::Note,
 		)]);
 		assert_eq!(idx.unresolved_links, vec![("a".to_string(), "Missing Target".to_string())]);
+	}
+
+	#[test]
+	fn fuzzy_case_insensitive() {
+		let idx = GraphIndex::build(vec![
+			note("algorithms", "Algorithms", None, vec![], NoteType::Note)
+		]);
+		assert!(idx.resolve_fuzzy("algorithms").is_some());
+		assert!(idx.resolve_fuzzy("ALGORITHMS").is_some());
+	}
+
+	#[test]
+	fn fuzzy_normalized() {
+		let idx = GraphIndex::build(vec![
+			note("distributed-systems", "Distributed Systems", None, vec![], NoteType::Note)
+		]);
+		assert!(idx.resolve_fuzzy("distributed systems").is_some());
+		assert!(idx.resolve_fuzzy("DistributedSystems").is_some());
+	}
+
+	#[test]
+	fn fuzzy_prefix() {
+		let idx = GraphIndex::build(vec![
+			note("algorithms", "Algorithms", None, vec![], NoteType::Note)
+		]);
+		assert!(idx.resolve_fuzzy("algo").is_some());
+	}
+	
+	#[test]
+	fn fuzzy_substring() {
+		let idx = GraphIndex::build(vec![
+			note("algorithms", "Algorithms", None, vec![], NoteType::Note)
+		]);
+		assert!(idx.resolve_fuzzy("rithm").is_some());
+	}
+
+	#[test]
+	fn fuzzy_tiebreaker_prefers_shorter() {
+		let idx = GraphIndex::build(vec![
+			note("algorithms", "Algorithms", None, vec![], NoteType::Note),
+			note("algo", "Algo", None, vec![], NoteType::Note)
+		]);
+		let r = idx.resolve_fuzzy("algo");
+		assert!(r.is_some());
+		assert_eq!(idx.graph[r.unwrap()].slug, "algo");
+	}
+
+	#[test]
+	fn ulid_returns_26_chars() {
+		let id = GraphIndex::generate_ulid();
+		assert_eq!(id.to_string().len(), 26);
 	}
 }

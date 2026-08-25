@@ -29,11 +29,12 @@ impl VaultScanner {
 			.file_stem()
 			.map(|s| s.to_string_lossy().to_string())
 			.unwrap_or_default();
-		
+
 		Ok(Note {
 			slug,
 			path: rel.to_path_buf(),
 			frontmatter,
+			body: body.to_string(),
 			links: parsed.links,
 			transclusions: parsed.transclusions,
 			blocks: parsed.blocks,

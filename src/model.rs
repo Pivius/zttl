@@ -56,6 +56,7 @@ pub struct Note {
 	pub slug: String,
 	pub path: PathBuf,
 	pub frontmatter: Frontmatter,
+	pub body: String,
 	pub links: Vec<String>,
 	pub transclusions: Vec<String>,
 	pub blocks: Vec<Block>,

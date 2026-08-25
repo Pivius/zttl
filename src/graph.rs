@@ -180,7 +180,7 @@ impl GraphIndex {
 		}
 	
 		let target_lower = target.to_lowercase();
-		let target_norm = target_lower.replace(['-', '_', ' '], "");
+		let target_norm = target.replace(['-', '_', ' '], "");
 		let mut best: Option<(i32, usize, NodeIndex)> = None;
 	
 		for (slug, idx) in &self.by_slug {
@@ -242,7 +242,8 @@ fn fuzzy_score(candidate: &str, target_lower: &str, target_norm: &str) -> i32 {
 #[cfg(test)]
 mod tests {
 	use std::assert_eq;
-	use super::*;
+
+use super::*;
 	use crate::model::Frontmatter;
 	
 	fn note(

@@ -1,14 +1,16 @@
 use crate::model::{Note, NoteType};
-use petgraph::graph::{Graph, NodeIndex};
+use petgraph::graph::{Edge, Graph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 use std::collections::{HashMap, HashSet};
+use std::matches;
 use ulid::Ulid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EdgeKind {
 	Contains,
 	Links,
+	Transcludes
 }
 
 #[derive(Debug, Clone)]
@@ -120,17 +122,22 @@ impl GraphIndex {
 				}
 			}
 		}
-		
+
+		let mut transclusion_edges = Vec::new();
 		let mut unresolved_transclusions = Vec::new();
 
 		for &n in &nodes {
-			let slug = graph[n].slug.clone();
-
 			for t in &graph[n].transclusions {
-				if !block_registry.contains_key(t) {
-					unresolved_transclusions.push((slug.clone(), t.clone()));
+				if let Some(block) = block_registry.get(t) {
+					transclusion_edges.push((n, block.note));
+				} else {
+					unresolved_transclusions.push((graph[n].slug.clone(), t.clone()));
 				}
 			}
+		}
+
+		for (source, target) in transclusion_edges {
+			graph.add_edge(source, target, EdgeKind::Transcludes);
 		}
 		
 		GraphIndex {
@@ -143,6 +150,45 @@ impl GraphIndex {
 			unresolved_parents,
 			unresolved_transclusions,
 		}
+	}
+
+	pub fn children_of(&self, n: NodeIndex) -> Vec<NodeIndex> {
+		self.graph
+			.edges_directed(n, Direction::Outgoing)
+			.filter(|e| *e.weight() == EdgeKind::Contains)
+			.map(|e| e.target())
+			.collect()
+	}
+
+	pub fn parents_of(&self, n: NodeIndex) -> Vec<NodeIndex> {
+		self.graph
+			.edges_directed(n, Direction::Incoming)
+			.filter(|e| *e.weight() == EdgeKind::Contains)
+			.map(|e| e.source())
+			.collect()
+	}
+
+	pub fn roots(&self) -> Vec<NodeIndex> {
+		self.graph
+			.node_indices()
+			.filter(|&n| self.parents_of(n).is_empty())
+			.collect()
+	}
+
+	pub fn forward_refs(&self, n: NodeIndex) -> Vec<(EdgeKind, NodeIndex)> {
+		self.graph
+			.edges_directed(n, Direction::Outgoing)
+			.filter(|e| matches!(*e.weight(), EdgeKind::Links | EdgeKind::Transcludes))
+			.map(|e| (*e.weight(), e.target()))
+			.collect()
+	}
+
+	pub fn backlinks_of(&self, n: NodeIndex) -> Vec<NodeIndex> {
+		self.graph
+			.edges_directed(n, Direction::Incoming)
+			.filter(|e| *e.weight() == EdgeKind::Links)
+			.map(|e| e.source())
+			.collect() 
 	}
 	
 	pub fn resolve(&self, target: &str) -> Option<NodeIndex> {

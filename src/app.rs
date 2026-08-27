@@ -1,6 +1,6 @@
 use std::{collections::HashSet};
 use petgraph::graph::NodeIndex;
-use crate::graph::{EdgeKind, GraphIndex};
+use crate::{graph::{EdgeKind, GraphIndex}, ui::{colors::ColorSupport, theme::Theme}};
 
 pub enum ViewMode { Ego, Spatial }
 pub enum RefKind {
@@ -27,26 +27,28 @@ pub struct App {
 	pub columns: Vec<Column>,
 	pub expanded: HashSet<NodeIndex>,
 	pub ego_focus: usize,
-	pub running: bool
+	pub running: bool,
+	pub theme: Theme
 }
 
 impl App {
 	//TODO - Config maintaining persistence
-	pub fn new(index: GraphIndex) -> App {
+	pub fn new(index: GraphIndex) -> Self {
 		let roots = index.roots();
 		let initial_column = Column {
 			items: roots,
 			focus: 0
 		};
 
-		App {
+		Self {
 			index,
 			mode: ViewMode::Ego,
 			active: None,
 			columns: vec![initial_column],
 			expanded: HashSet::new(),
 			ego_focus: 0,
-			running: true
+			running: true,
+			theme: Theme::new(ColorSupport::detect())
 		}
 	}
 

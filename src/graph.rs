@@ -1,5 +1,5 @@
 use crate::model::{Note, NoteType};
-use petgraph::graph::{Edge, Graph, NodeIndex};
+use petgraph::graph::{Graph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 use std::collections::{HashMap, HashSet};

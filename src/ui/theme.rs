@@ -1,44 +1,39 @@
 use ratatui::style::Color;
-
-use crate::ui::colors::{ColorSupport, try_color};
+use crate::ui::colors::{ColorSupport, AppColor};
 
 #[derive(Debug, Clone, Copy)]
-pub enum Gradient {
-	Gradient0,
-	Gradient1,
-	Gradient2,
-	Gradient3,
-	Gradient4,
-	Gradient5,
-	Gradient6,
-	Gradient7,
-	Gradient8,
-	Gradient9,
-	Gradient10,
-	Gradient11,
-	Gradient12,
-	Gradient13,
-	Gradient14,
+pub enum Palette {
+	MidnightBlack,
+	AegeanBlue,
+	AverageBlue,
+	
+	// Complementary
+	DeepCharcoal,
+	SubtleBorder,
+	
+	IceWhite,
+	MutedSlate,
+	
+	CrimsonRed,
+	AmberGold,
+	EmeraldGreen,
+	CyanInfo
 }
 
-impl Gradient {
-	pub fn rgb(self) -> (u8, u8, u8) {
+impl Palette {
+	pub fn color(self) -> AppColor {
 		match self {
-			Self::Gradient0 => (46, 41, 48),   // #2E2930
-			Self::Gradient1 => (60, 50, 69),   // #3C3245
-			Self::Gradient2 => (72, 60, 93),   // #483C5D
-			Self::Gradient3 => (82, 71, 118),  // #524776
-			Self::Gradient4 => (88, 83, 146),  // #585392
-			Self::Gradient5 => (90, 96, 174),  // #5A60AE
-			Self::Gradient6 => (87, 111, 202), // #576FCA
-			Self::Gradient7 => (77, 128, 230), // #4D80E6
-			Self::Gradient8 => (88, 117, 210), // #5875D2
-			Self::Gradient9 => (94, 107, 190), // #5E6BBE
-			Self::Gradient10 => (96, 98, 169), // #6062A9
-			Self::Gradient11 => (95, 90, 149), // #5F5A95
-			Self::Gradient12 => (92, 82, 129), // #5C5281
-			Self::Gradient13 => (86, 75, 110), // #564B6E
-			Self::Gradient14 => (79, 69, 92),  // #4F455C
+			Self::MidnightBlack => AppColor::new(0, 0, 11),   // #01000b
+			Self::AegeanBlue => AppColor::new(68, 97, 123),   // #44617B
+			Self::AverageBlue => AppColor::new(77, 128, 230), // #4D80E6
+			Self::DeepCharcoal => AppColor::new(18, 24, 38),  // #121826
+			Self::SubtleBorder => AppColor::new(36, 48, 68),  // #243044
+			Self::IceWhite => AppColor::new(230, 240, 255),   // #E7F0FF
+			Self::MutedSlate => AppColor::new(112, 138, 165), // #708AA5
+			Self::CrimsonRed => AppColor::new(224, 72, 90),   // #E0485A
+			Self::AmberGold => AppColor::new(228, 160, 62),   // #E4A03E
+			Self::EmeraldGreen => AppColor::new(60, 185, 140),// #3CB98C
+			Self::CyanInfo => AppColor::new(56, 178, 206),    // #38B2CE
 		}
 	}
 }
@@ -62,19 +57,19 @@ pub struct Theme {
 impl Theme {
 	pub fn new(support: ColorSupport) -> Self {
 		Self {
-			background: try_color(Gradient::Gradient0.rgb(), &support),
-			foreground: try_color(Gradient::Gradient14.rgb(), &support),
-			text: Color::White,
-			muted_text: Color::Gray,
-			border: try_color(Gradient::Gradient2.rgb(), &support),
-			focused_border: try_color(Gradient::Gradient7.rgb(), &support),
-			selection: try_color(Gradient::Gradient3.rgb(), &support),
-			cursor: Color::White,
-			accent: try_color(Gradient::Gradient7.rgb(), &support),
-			error: Color::Red,
-			warning: Color::Yellow,
-			success: try_color(Gradient::Gradient9.rgb(), &support),
-			info: try_color(Gradient::Gradient6.rgb(), &support),
+			background: Palette::MidnightBlack.color().to_tui(&support),
+			foreground: Palette::DeepCharcoal.color().to_tui(&support),
+			text: Palette::IceWhite.color().to_tui(&support),
+			muted_text: Palette::MutedSlate.color().to_tui(&support),
+			border: Palette::SubtleBorder.color().to_tui(&support),
+			focused_border: Palette::AverageBlue.color().to_tui(&support),
+			selection: Palette::AegeanBlue.color().darken(0.2).to_tui(&support),
+			cursor: Palette::IceWhite.color().to_tui(&support),
+			accent: Palette::AverageBlue.color().to_tui(&support),
+			error: Palette::CrimsonRed.color().to_tui(&support),
+			warning: Palette::AmberGold.color().to_tui(&support),
+			success: Palette::EmeraldGreen.color().to_tui(&support),
+			info: Palette::CyanInfo.color().to_tui(&support),
 		}
 	}
 }

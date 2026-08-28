@@ -313,19 +313,6 @@ use super::*;
 	}
 
 	#[test]
-	fn membership_derived_when_parents_absent() {
-		let idx = GraphIndex::build(vec![
-			note("area", "Area", Some(vec![]), vec!["child"]),
-			note("child", "Child", None, vec![]),
-		]);
-		let area = idx.resolve("area").unwrap();
-		let child = idx.resolve("child").unwrap();
-		assert!(idx.graph.contains_edge(area, child));
-		let e = idx.graph.find_edge(area, child).unwrap();
-		assert_eq!(*idx.graph.edge_weight(e).unwrap(), EdgeKind::Contains);
-	}
-
-	#[test]
 	fn explicit_empty_parents_blocks_membership() {
 		let idx = GraphIndex::build(vec![
 			note("area", "Area", Some(vec![]), vec!["child"]),

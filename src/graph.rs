@@ -31,7 +31,7 @@ pub struct GraphIndex {
 }
 
 impl GraphIndex {
-	pub fn build(notes: Vec<Note>) -> GraphIndex {
+	pub fn build(notes: Vec<Note>) -> Self {
 		let mut graph = Graph::<Note, EdgeKind>::new();
 		let mut by_id = HashMap::new();
 		let mut by_slug = HashMap::new();
@@ -140,7 +140,7 @@ impl GraphIndex {
 			graph.add_edge(source, target, EdgeKind::Transcludes);
 		}
 		
-		GraphIndex {
+		Self {
 			graph,
 			by_id,
 			by_slug,

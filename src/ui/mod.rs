@@ -1,8 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{Frame, layout::{Constraint, Direction, Layout}};
+use ratatui::{Frame, layout::{Constraint, Direction, Layout}, style::Stylize, widgets::Block};
 
 use crate::app::App;
 
+pub mod colors;
+pub mod theme;
 mod editor;
 mod nav;
 mod toolbar;
@@ -17,6 +19,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
 		.direction(Direction::Horizontal)
 		.constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
 		.split(main_chunks[0]);
+	
+	frame.render_widget(Block::new().bg(app.theme.background), frame.area());
 
 	nav::render(frame, nav_chunks[0], app);
 	editor::render(frame, nav_chunks[1], app);

@@ -52,6 +52,7 @@ pub struct Theme {
 	pub warning: Color,
 	pub success: Color,
 	pub info: Color,
+	pub support: ColorSupport
 }
 
 impl Theme {
@@ -70,6 +71,7 @@ impl Theme {
 			warning: Palette::AmberGold.color().to_tui(&support),
 			success: Palette::EmeraldGreen.color().to_tui(&support),
 			info: Palette::CyanInfo.color().to_tui(&support),
+			support
 		}
 	}
 }

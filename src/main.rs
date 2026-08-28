@@ -33,8 +33,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 	enable_raw_mode()?;
 
 	let mut stdout_handle = stdout();
-	
-	execute!(stdout_handle, EnterAlternateScreen);
+
+	execute!(stdout_handle, EnterAlternateScreen)?;
 
 	let backend = CrosstermBackend::new(stdout_handle);
 	let mut terminal = Terminal::new(backend)?;

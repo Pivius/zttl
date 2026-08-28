@@ -10,7 +10,7 @@ Navigation is split into two modes over the same notes:
 
 ## Run
 ```bash
-git clone [https://github.com/Pivius/zttl.git](https://github.com/Pivius/zttl.git)
+git clone https://github.com/Pivius/zttl.git
 cd zttl
 
 cargo run

@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		original_hook(panic_info);
 	}));
 
-	let vault_path = PathBuf::from(".");
+	let vault_path = PathBuf::from("./vault");
 	let index = VaultScanner::scan(&vault_path)?;
 	let mut app = App::new(index);
 

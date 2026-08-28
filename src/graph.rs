@@ -1,4 +1,4 @@
-use crate::model::{Note, NoteType};
+use crate::model::Note;
 use petgraph::graph::{Graph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
@@ -68,28 +68,7 @@ impl GraphIndex {
 				}
 			}
 		}
-		
-		for &s in &nodes {
-			let is_struct = matches!(
-				graph[s].frontmatter.r#type,
-				NoteType::Area | NoteType::Project
-			);
 
-			if !is_struct {
-				continue;
-			}
-
-			for link in graph[s].links.clone() {
-				let Some(t) = resolve_ref(&by_id, &by_slug, &by_title, &link) else {
-					continue;
-				};
-
-				if graph[t].frontmatter.parents.is_none() {
-					graph.add_edge(s, t, EdgeKind::Contains);
-				}
-			}
-		}
-		
 		let mut unresolved_links = Vec::new();
 
 		for &n in &nodes {
@@ -101,7 +80,11 @@ impl GraphIndex {
 					continue;
 				};
 
-				if !graph.contains_edge(n, t) {
+				let duplicate = graph
+					.edges_directed(n, Direction::Outgoing)
+					.any(|e| e.target() == t && *e.weight() == EdgeKind::Links);
+
+				if !duplicate {
 					graph.add_edge(n, t, EdgeKind::Links);
 				}
 			}
@@ -183,11 +166,11 @@ impl GraphIndex {
 			.collect()
 	}
 
-	pub fn backlinks_of(&self, n: NodeIndex) -> Vec<NodeIndex> {
+	pub fn backlinks_of(&self, n: NodeIndex) -> Vec<(EdgeKind, NodeIndex)> {
 		self.graph
 			.edges_directed(n, Direction::Incoming)
-			.filter(|e| *e.weight() == EdgeKind::Links)
-			.map(|e| e.source())
+			.filter(|e| matches!(*e.weight(), EdgeKind::Links | EdgeKind::Transcludes))
+			.map(|e| (*e.weight(), e.source()))
 			.collect() 
 	}
 	
@@ -297,7 +280,6 @@ use super::*;
 		title: &str,
 		parents: Option<Vec<&str>>,
 		links: Vec<&str>,
-		ty: NoteType,
 	) -> Note {
 		Note {
 			slug: slug.to_string(),
@@ -305,7 +287,6 @@ use super::*;
 			frontmatter: Frontmatter {
 				id: None,
 				title: Some(title.to_string()),
-				r#type: ty,
 				status: Default::default(),
 				parents: parents.map(|v| v.into_iter().map(str::to_string).collect()),
 				..Default::default()
@@ -320,8 +301,8 @@ use super::*;
 	#[test]
 	fn explicit_parents_become_containment() {
 		let idx = GraphIndex::build(vec![
-			note("ds", "Data Structures", Some(vec![]), vec!["Algorithms"], NoteType::Area),
-			note("algo", "Algorithms", Some(vec!["ds"]), vec![], NoteType::Area),
+			note("ds", "Data Structures", Some(vec![]), vec!["Algorithms"]),
+			note("algo", "Algorithms", Some(vec!["ds"]), vec![]),
 		]);
 		let ds = idx.resolve("ds").unwrap();
 		let algo = idx.resolve("algo").unwrap();
@@ -334,8 +315,8 @@ use super::*;
 	#[test]
 	fn membership_derived_when_parents_absent() {
 		let idx = GraphIndex::build(vec![
-			note("area", "Area", Some(vec![]), vec!["child"], NoteType::Area),
-			note("child", "Child", None, vec![], NoteType::Note),
+			note("area", "Area", Some(vec![]), vec!["child"]),
+			note("child", "Child", None, vec![]),
 		]);
 		let area = idx.resolve("area").unwrap();
 		let child = idx.resolve("child").unwrap();
@@ -347,8 +328,8 @@ use super::*;
 	#[test]
 	fn explicit_empty_parents_blocks_membership() {
 		let idx = GraphIndex::build(vec![
-			note("area", "Area", Some(vec![]), vec!["child"], NoteType::Area),
-			note("child", "Child", Some(vec![]), vec![], NoteType::Note),
+			note("area", "Area", Some(vec![]), vec!["child"]),
+			note("child", "Child", Some(vec![]), vec![]),
 		]);
 		let area = idx.resolve("area").unwrap();
 		let child = idx.resolve("child").unwrap();
@@ -358,7 +339,7 @@ use super::*;
 
 	#[test]
 	fn resolution_prefers_id_then_title_then_slug() {
-		let mut notes = vec![note("slug-name", "Title Name", None, vec![], NoteType::Note)];
+		let mut notes = vec![note("slug-name", "Title Name", None, vec![])];
 		notes[0].frontmatter.id = Some("ulid-123".to_string());
 		let idx = GraphIndex::build(notes);
 		assert_eq!(idx.resolve("ulid-123"), idx.resolve("Title Name"));
@@ -372,7 +353,6 @@ use super::*;
 			"A",
 			None,
 			vec!["Missing Target"],
-			NoteType::Note,
 		)]);
 		assert_eq!(idx.unresolved_links, vec![("a".to_string(), "Missing Target".to_string())]);
 	}
@@ -380,7 +360,7 @@ use super::*;
 	#[test]
 	fn fuzzy_case_insensitive() {
 		let idx = GraphIndex::build(vec![
-			note("algorithms", "Algorithms", None, vec![], NoteType::Note)
+			note("algorithms", "Algorithms", None, vec![])
 		]);
 		assert!(idx.resolve_fuzzy("algorithms").is_some());
 		assert!(idx.resolve_fuzzy("ALGORITHMS").is_some());
@@ -389,7 +369,7 @@ use super::*;
 	#[test]
 	fn fuzzy_normalized() {
 		let idx = GraphIndex::build(vec![
-			note("distributed-systems", "Distributed Systems", None, vec![], NoteType::Note)
+			note("distributed-systems", "Distributed Systems", None, vec![])
 		]);
 		assert!(idx.resolve_fuzzy("distributed systems").is_some());
 		assert!(idx.resolve_fuzzy("DistributedSystems").is_some());
@@ -398,7 +378,7 @@ use super::*;
 	#[test]
 	fn fuzzy_prefix() {
 		let idx = GraphIndex::build(vec![
-			note("algorithms", "Algorithms", None, vec![], NoteType::Note)
+			note("algorithms", "Algorithms", None, vec![])
 		]);
 		assert!(idx.resolve_fuzzy("algo").is_some());
 	}
@@ -406,7 +386,7 @@ use super::*;
 	#[test]
 	fn fuzzy_substring() {
 		let idx = GraphIndex::build(vec![
-			note("algorithms", "Algorithms", None, vec![], NoteType::Note)
+			note("algorithms", "Algorithms", None, vec![])
 		]);
 		assert!(idx.resolve_fuzzy("rithm").is_some());
 	}
@@ -414,8 +394,8 @@ use super::*;
 	#[test]
 	fn fuzzy_tiebreaker_prefers_shorter() {
 		let idx = GraphIndex::build(vec![
-			note("algorithms", "Algorithms", None, vec![], NoteType::Note),
-			note("algo", "Algo", None, vec![], NoteType::Note)
+			note("algorithms", "Algorithms", None, vec![]),
+			note("algo", "Algo", None, vec![])
 		]);
 		let r = idx.resolve_fuzzy("algo");
 		assert!(r.is_some());

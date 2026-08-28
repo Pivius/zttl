@@ -2,11 +2,14 @@ use std::{collections::HashSet};
 use petgraph::graph::NodeIndex;
 use crate::{graph::{EdgeKind, GraphIndex}, ui::{colors::ColorSupport, theme::Theme}};
 
+pub const MAX_COLUMNS: usize = 3;
+
 pub enum ViewMode { Ego, Spatial }
 pub enum RefKind {
 	Conceptual,
 	Structural,
-	Backlink
+	Backlink,
+	StructuralBacklink
 }
 
 pub struct Column {
@@ -36,14 +39,15 @@ impl App {
 	pub fn new(index: GraphIndex) -> Self {
 		let roots = index.roots();
 		let initial_column = Column {
-			items: roots,
+			items: roots.clone(),
 			focus: 0
 		};
+		let active = roots.first().copied();
 
 		Self {
 			index,
 			mode: ViewMode::Ego,
-			active: None,
+			active,
 			columns: vec![initial_column],
 			expanded: HashSet::new(),
 			ego_focus: 0,
@@ -92,14 +96,19 @@ impl App {
 		for (kind, target) in self.index.forward_refs(parent) {
 			let category = match kind {
 				EdgeKind::Transcludes => RefKind::Structural,
-				EdgeKind::Links | _ => RefKind::Conceptual
+				_ => RefKind::Conceptual
 			};
 
 			children.push((target, category));
 		}
 
-		for source in self.index.backlinks_of(parent) {
-			children.push((source, RefKind::Backlink));
+		for (kind, source) in self.index.backlinks_of(parent) {
+			let category = match kind {
+				EdgeKind::Transcludes => RefKind::StructuralBacklink,
+				_ => RefKind::Backlink
+			};
+			
+			children.push((source, category));
 		}
 
 		for (node, category) in children {

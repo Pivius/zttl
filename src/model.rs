@@ -3,16 +3,6 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum NoteType {
-	#[default]
-	Note,
-	Project,
-	Area,
-	Resource,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
 pub enum Status {
 	#[default]
 	Active,
@@ -25,8 +15,6 @@ pub struct Frontmatter {
 	pub id: Option<String>,
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub title: Option<String>,
-	#[serde(default, rename = "type")]
-	pub r#type: NoteType,
 	#[serde(default)]
 	pub status: Status,
 	#[serde(default, skip_serializing_if = "Option::is_none")]

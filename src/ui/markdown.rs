@@ -20,14 +20,14 @@ impl TagRule for HeadingRule {
 	fn style(&self, base: Style) -> Style {
 		let style = match self.0 {
 			HeadingLevel::H1 => Style::default()
-			.fg(Color::Cyan)
-			.add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+				.fg(Color::Cyan)
+				.add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
 			HeadingLevel::H2 => Style::default()
-			.fg(Color::Yellow)
-			.add_modifier(Modifier::BOLD),
+				.fg(Color::Yellow)
+				.add_modifier(Modifier::BOLD),
 			_ => Style::default()
-			.fg(Color::Green)
-			.add_modifier(Modifier::BOLD),
+				.fg(Color::Green)
+				.add_modifier(Modifier::BOLD),
 		};
 		base.patch(style)
 	}

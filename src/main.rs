@@ -1,3 +1,4 @@
+mod font_profile;
 mod graph;
 mod model;
 mod parser;

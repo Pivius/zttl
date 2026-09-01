@@ -24,6 +24,10 @@ impl AppColor {
 		Self(darkened.into_format())
 	}
 
+	pub fn rgb(self) -> (u8, u8, u8) {
+		(self.0.red, self.0.green, self.0.blue)
+	}
+
 	pub fn to_tui(self, support: &ColorSupport) -> TuiColor {
 		let (r, g, b) = (self.0.red, self.0.green, self.0.blue);
 

@@ -1,4 +1,5 @@
 use ratatui::style::Color;
+use pulldown_cmark::HeadingLevel;
 use crate::ui::colors::{ColorSupport, AppColor};
 
 #[derive(Debug, Clone, Copy)]
@@ -71,7 +72,15 @@ impl Theme {
 			warning: Palette::AmberGold.color().to_tui(&support),
 			success: Palette::EmeraldGreen.color().to_tui(&support),
 			info: Palette::CyanInfo.color().to_tui(&support),
-			support
-		}
+		support
+	}
+}
+}
+
+pub fn header_fill(level: HeadingLevel) -> (u8, u8, u8) {
+	match level {
+		HeadingLevel::H1 => Palette::AverageBlue.color().rgb(),
+		HeadingLevel::H2 => Palette::EmeraldGreen.color().rgb(),
+		_ => Palette::CyanInfo.color().rgb(),
 	}
 }

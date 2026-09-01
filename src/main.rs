@@ -1,4 +1,3 @@
-mod font_profile;
 mod graph;
 mod model;
 mod parser;
@@ -26,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		restore_terminal();
 		original_hook(panic_info);
 	}));
-
+	
 	let vault_path = PathBuf::from("./vault");
 	let index = VaultScanner::scan(&vault_path)?;
 	let mut app = App::new(index);

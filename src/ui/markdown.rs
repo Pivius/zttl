@@ -1,9 +1,14 @@
 use std::vec;
-
+use image::DynamicImage;
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use ratatui::{style::{Color, Modifier, Style}, text::{Line, Span}};
 
 use crate::app::App;
+
+pub enum MarkdownBlock {
+	HeaderImage { text: String, level: HeadingLevel },
+	TextBlock(Vec<Line<'static>>),
+}
 
 pub trait TagRule {
 	fn style(&self, base: Style) -> Style {
@@ -71,58 +76,77 @@ pub fn resolve_rule(tag: &Tag) -> Option<Box<dyn TagRule>> {
 	}
 }
 
-pub fn render_markdown<'a>(content: &'a str, app: &App) -> Vec<Line<'a>> {
-	let mut lines = Vec::new();
-	let mut current_line = Vec::new();
-	let mut style_stack = vec![Style::default()];
+fn flush_line(lines: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>) {
+	if !current.is_empty() {
+		lines.push(Line::from(std::mem::take(current)));
+	}
+}
+
+pub fn render_markdown(content: &str, app: &App) -> Vec<MarkdownBlock> {
+	let mut blocks: Vec<MarkdownBlock> = Vec::new();
+	let mut lines: Vec<Line<'static>> = Vec::new();
+	let mut current_line: Vec<Span<'static>> = Vec::new();
+	let mut style_stack: Vec<Style> = vec![Style::default()];
+	let mut heading: Option<(HeadingLevel, String)> = None;
+
 	let parser = Parser::new_ext(content, Options::ENABLE_TABLES);
-	
+
 	for event in parser {
 		match event {
-			Event::Start(tag) => {
-				let current = *style_stack.last().unwrap_or(&Style::default());
+			Event::Start(Tag::Heading { level, .. }) => {
+				heading = Some((level, String::new()));
+			},
+			Event::End(TagEnd::Heading(level)) => {
+				flush_line(&mut lines, &mut current_line);
 				
+				if !lines.is_empty() {
+					blocks.push(MarkdownBlock::TextBlock(std::mem::take(&mut lines)));
+				}
+
+				let (_, text) = heading.take().unwrap_or((level, String::new()));
+
+				blocks.push(MarkdownBlock::HeaderImage { text, level });
+			},
+			Event::Text(t) if heading.is_some() => heading.as_mut().unwrap().1.push_str(&t),
+			Event::Code(c) if heading.is_some() => heading.as_mut().unwrap().1.push_str(&c),
+			Event::SoftBreak | Event::HardBreak if heading.is_some() => heading.as_mut().unwrap().1.push(' '),
+			// Not heading events
+			Event::Start(tag) if heading.is_none() => {
+				let current = *style_stack.last().unwrap_or(&Style::default());
 				if let Some(rule) = resolve_rule(&tag) {
 					let new_style = rule.style(current);
-					
 					if let Some(prefix) = rule.prefix() {
 						current_line.push(Span::styled(prefix, new_style));
 					}
-					
 					style_stack.push(new_style);
 				} else {
 					style_stack.push(current);
 				}
 			},
-			Event::End(tag) => {
+			Event::End(tag) if heading.is_none() => {
 				style_stack.pop();
-				
-				if matches!(tag, TagEnd::Heading(_) | TagEnd::Item | TagEnd::Paragraph) && !current_line.is_empty() {
+				if matches!(tag, TagEnd::Item | TagEnd::Paragraph) && !current_line.is_empty() {
 					lines.push(Line::from(std::mem::take(&mut current_line)));
 				}
 			},
 			Event::Text(text) => {
-				let active_style = *style_stack.last().unwrap_or(&Style::default());
-				
-				current_line.push(Span::styled(text.to_string(), active_style));
+				let active = *style_stack.last().unwrap_or(&Style::default());
+				current_line.push(Span::styled(text.to_string(), active));
 			},
 			Event::Code(code) => {
 				let code_style = Style::default().bg(app.theme.selection);
-				
 				current_line.push(Span::styled(format!(" {} ", code), code_style));
 			},
-			Event::SoftBreak | Event::HardBreak => {
-				if !current_line.is_empty() {
-					lines.push(Line::from(std::mem::take(&mut current_line)));
-				}
-			},
+			Event::SoftBreak | Event::HardBreak => flush_line(&mut lines, &mut current_line),
 			_ => {}
 		}
 	}
-	
-	if !current_line.is_empty() {
-		lines.push(Line::from(current_line));
+
+	flush_line(&mut lines, &mut current_line);
+
+	if !lines.is_empty() {
+		blocks.push(MarkdownBlock::TextBlock(lines));
 	}
-	
-	lines
+
+	blocks
 }

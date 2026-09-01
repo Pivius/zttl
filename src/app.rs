@@ -1,10 +1,18 @@
-use std::{collections::HashSet};
+use std::{cell::RefCell, collections::{HashMap, HashSet}};
 use petgraph::graph::NodeIndex;
+use ratatui_image::{picker::Picker, protocol::Protocol};
 use crate::{graph::{EdgeKind, GraphIndex}, ui::{colors::ColorSupport, theme::Theme}};
 
 pub const MAX_COLUMNS: usize = 3;
+pub const H1_SCALE: f32 = 3.0;
+pub const H2_SCALE: f32 = 2.0;
+pub const H3_SCALE: f32 = 1.5;
+
+#[derive(Hash, PartialEq, Eq)]
+pub struct HeaderKey { pub slug: String, pub text: String, pub level: u8, pub width: u16 }
 
 pub enum ViewMode { Ego, Spatial }
+
 pub enum RefKind {
 	Conceptual,
 	Structural,
@@ -31,7 +39,10 @@ pub struct App {
 	pub expanded: HashSet<NodeIndex>,
 	pub ego_focus: usize,
 	pub running: bool,
-	pub theme: Theme
+	pub theme: Theme,
+	pub font_family: String,
+	pub image_picker: Option<Picker>,
+	pub header_cache: RefCell<HashMap<HeaderKey, Protocol>>
 }
 
 impl App {
@@ -52,7 +63,10 @@ impl App {
 			expanded: HashSet::new(),
 			ego_focus: 0,
 			running: true,
-			theme: Theme::new(ColorSupport::detect())
+			theme: Theme::new(ColorSupport::detect()),
+			font_family: what_terminal_font::detect_terminal_font().unwrap_or("monospace".to_string()),
+			image_picker: ratatui_image::picker::Picker::from_query_stdio().ok(),
+			header_cache: RefCell::default()
 		}
 	}
 

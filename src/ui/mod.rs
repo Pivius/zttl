@@ -5,6 +5,7 @@ use crate::app::{App, ViewMode};
 
 pub mod colors;
 pub mod theme;
+mod header_image;
 mod markdown;
 mod editor;
 mod nav;
